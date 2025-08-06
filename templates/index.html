@@ -1,35 +1,277 @@
-<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Department</label>
-                                <select id="uploadDepartmentSelect" name="department" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
-                                    <option value="">Choose a department...</option>
-                                </select>
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">State</label>
-                                <select id="uploadStateSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
-                                    <option value="">Choose a state...</option>
-                                </select>
-                            </div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDS Assistant - AI-Powered Safety Data Sheet Management</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card-hover:hover { transform: translateY(-2px); transition: transform 0.2s; }
+        .chat-container { max-height: 400px; overflow-y: auto; }
+        .message { margin-bottom: 1rem; }
+        .user-message { background: #3b82f6; color: white; }
+        .ai-message { background: #f3f4f6; color: #374151; }
+        .web-result { border-left: 4px solid #10b981; background: #ecfdf5; }
+        .local-result { border-left: 4px solid #3b82f6; background: #eff6ff; }
+        .loading-spinner { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        
+        .ghs-option { 
+            border: 2px solid #e5e7eb; 
+            border-radius: 8px; 
+            padding: 12px; 
+            cursor: pointer; 
+            transition: all 0.2s;
+        }
+        .ghs-option:hover { border-color: #3b82f6; background: #f8fafc; }
+        .ghs-option.selected { border-color: #3b82f6; background: #eff6ff; }
+        
+        .pictogram-selector {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        .pictogram-item {
+            padding: 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .pictogram-item:hover { background: #f3f4f6; }
+        .pictogram-item.selected { background: #dbeafe; border-color: #3b82f6; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="gradient-bg shadow-lg">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <i class="fas fa-flask text-white text-2xl mr-3"></i>
+                    <span class="text-white text-xl font-bold">SDS Assistant</span>
+                    <span class="text-white text-sm ml-2 opacity-75">AI-Powered Safety Data Sheet Management</span>
+                    <span class="bg-green-500 text-white text-xs px-2 py-1 rounded-full ml-3">Web Search Enabled</span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button id="uploadBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition">
+                        <i class="fas fa-upload mr-2"></i>Upload SDS
+                    </button>
+                    <div class="relative">
+                        <button id="generateStickerBtn" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg transition">
+                            <i class="fas fa-tag mr-2"></i>Generate Sticker
+                        </button>
+                        <div id="stickerDropdown" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 hidden">
+                            <button id="generateNFPAQuick" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                <i class="fas fa-diamond mr-2 text-red-500"></i>NFPA Diamond
+                            </button>
+                            <button id="generateGHSQuick" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                <i class="fas fa-exclamation-triangle mr-2 text-orange-500"></i>GHS Label
+                            </button>
+                            <button id="generateGHSCustom" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                <i class="fas fa-cog mr-2 text-blue-500"></i>Custom GHS Label
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Dashboard Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow p-6 card-hover">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                        <i class="fas fa-file-alt text-2xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Total Documents</p>
+                        <p id="totalDocs" class="text-2xl font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6 card-hover">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-green-100 text-green-600">
+                        <i class="fas fa-map-marker-alt text-2xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Active Locations</p>
+                        <p id="activeLocations" class="text-2xl font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6 card-hover">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-purple-100 text-purple-600">
+                        <i class="fas fa-question-circle text-2xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Recent Questions</p>
+                        <p id="recentQuestions" class="text-2xl font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6 card-hover">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-orange-100 text-orange-600">
+                        <i class="fas fa-globe text-2xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Web Searches</p>
+                        <p id="webSearches" class="text-2xl font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- AI Question Answering -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="p-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">
+                        <i class="fas fa-robot mr-2"></i>Ask AI About SDS Documents
+                        <span class="text-sm font-normal text-green-600 ml-2">
+                            <i class="fas fa-wifi mr-1"></i>Web Search Active
+                        </span>
+                    </h2>
+                    
+                    <div class="mb-4">
+                        <select id="locationFilter" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="">All Locations</option>
+                        </select>
+                    </div>
+                    
+                    <div id="chatContainer" class="chat-container border rounded-lg p-4 mb-4 bg-gray-50">
+                        <div class="message ai-message p-3 rounded-lg local-result">
+                            <p><strong>AI Assistant:</strong> Hello! I can help you find information in your SDS documents and search the web for additional safety information. Try asking questions like:</p>
+                            <ul class="mt-2 ml-4 list-disc text-sm">
+                                <li>"What are the first aid measures for acetone?"</li>
+                                <li>"How should I store bleach safely?"</li>
+                                <li>"What PPE is needed for handling sulfuric acid?"</li>
+                                <li>"What are the fire fighting measures for methanol?"</li>
+                            </ul>
+                            <p class="text-xs text-green-600 mt-2">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                If I can't find information in your documents, I'll automatically search the web for additional safety data.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex space-x-2">
+                        <input 
+                            type="text" 
+                            id="questionInput" 
+                            placeholder="Ask a question about chemical safety..."
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        >
+                        <button id="askBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <h4 class="font-semibold text-gray-700 mb-2">Quick Questions:</h4>
+                        <div class="flex flex-wrap gap-2">
+                            <button class="quick-question bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-full text-sm transition" data-question="What are the first aid measures for this chemical?">
+                                First Aid
+                            </button>
+                            <button class="quick-question bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-full text-sm transition" data-question="How should this chemical be stored safely?">
+                                Storage
+                            </button>
+                            <button class="quick-question bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-full text-sm transition" data-question="What PPE is required for handling this chemical?">
+                                PPE Requirements
+                            </button>
+                            <button class="quick-question bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-full text-sm transition" data-question="What are the fire fighting measures for this chemical?">
+                                Fire Fighting
+                            </button>
+                            <button class="quick-question bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-full text-sm transition" data-question="What are the health hazards of this chemical?">
+                                Health Hazards
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- File Upload & Management -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="p-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">
+                        <i class="fas fa-cloud-upload-alt mr-2"></i>Document Management
+                    </h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <button id="uploadDocBtn" class="bg-blue-100 hover:bg-blue-200 p-4 rounded-lg transition text-center">
+                            <i class="fas fa-upload text-blue-600 text-2xl mb-2"></i>
+                            <h3 class="font-semibold">Upload SDS File</h3>
+                            <p class="text-sm text-gray-600">PDF, TXT, DOC files</p>
+                        </button>
+                        
+                        <button id="webSearchInfo" class="bg-green-100 hover:bg-green-200 p-4 rounded-lg transition text-center">
+                            <i class="fas fa-globe text-green-600 text-2xl mb-2"></i>
+                            <h3 class="font-semibold">Auto Web Search</h3>
+                            <p class="text-sm text-gray-600">Automatic when needed</p>
+                        </button>
+                    </div>
+                    
+                    <div id="recentDocuments">
+                        <h4 class="font-semibold text-gray-700 mb-3">Recent Documents</h4>
+                        <div id="documentsList" class="space-y-2">
+                            <p class="text-gray-500 text-center py-4">No documents uploaded yet</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Popular Questions -->
+        <div class="mt-8 bg-white rounded-lg shadow">
+            <div class="p-6">
+                <h3 class="text-xl font-bold text-gray-900 mb-4">Popular Questions</h3>
+                <div id="popularQuestions" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <p class="text-gray-500 text-center py-4 col-span-2">No questions asked yet</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Modal -->
+    <div id="uploadModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-bold text-gray-900">Upload SDS Document</h3>
+                        <button id="closeUploadModal" class="text-gray-400 hover:text-gray-600">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <form id="uploadForm" enctype="multipart/form-data">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">State</label>
+                            <select id="uploadStateSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                                <option value="">Choose a state...</option>
+                            </select>
                         </div>
                         
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">City</label>
-                                <select id="uploadCitySelect" name="city" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
-                                    <option value="">Choose a city...</option>
-                                </select>
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Country</label>
-                                <select name="country" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
-                                    <option value="United States">United States</option>
-                                    <option value="Canada">Canada</option>
-                                    <option value="Mexico">Mexico</option>
-                                </select>
-                            </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                            <select id="uploadLocationSelect" name="location_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                                <option value="">Choose a location...</option>
+                            </select>
                         </div>
                         
                         <div class="mb-4">
@@ -63,115 +305,136 @@
         </div>
     </div>
 
-    <!-- Web Search Modal -->
-    <div id="webSearchModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
+    <!-- Enhanced GHS Modal -->
+    <div id="ghsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
         <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="bg-white rounded-lg shadow-xl max-w-lg w-full">
+            <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                 <div class="p-6">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-bold text-gray-900">Manual Web Search for SDS</h3>
-                        <button id="closeWebSearchModal" class="text-gray-400 hover:text-gray-600">
+                        <h3 class="text-lg font-bold text-gray-900">Generate GHS Label</h3>
+                        <button id="closeGHSModal" class="text-gray-400 hover:text-gray-600">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
                     
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                        <p class="text-sm text-blue-800">
-                            <i class="fas fa-info-circle mr-2"></i>
-                            <strong>Auto Search:</strong> The AI automatically searches online when you ask questions. Use this for manual searches of specific chemicals.
-                        </p>
+                    <!-- GHS Generation Options -->
+                    <div class="mb-6">
+                        <h4 class="font-medium text-gray-700 mb-3">Choose Generation Method:</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="ghs-option" data-option="auto">
+                                <div class="flex items-center mb-2">
+                                    <i class="fas fa-magic text-blue-500 mr-2"></i>
+                                    <span class="font-medium">Auto Generate</span>
+                                </div>
+                                <p class="text-sm text-gray-600">Use existing SDS data</p>
+                            </div>
+                            <div class="ghs-option" data-option="custom">
+                                <div class="flex items-center mb-2">
+                                    <i class="fas fa-cog text-green-500 mr-2"></i>
+                                    <span class="font-medium">Custom Options</span>
+                                </div>
+                                <p class="text-sm text-gray-600">Specify your own GHS data</p>
+                            </div>
+                        </div>
                     </div>
                     
-                    <form id="webSearchForm">
+                    <!-- Product Name -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Product Name</label>
+                        <input type="text" id="ghsProductName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Enter product name...">
+                    </div>
+                    
+                    <!-- Custom GHS Options (initially hidden) -->
+                    <div id="customGHSOptions" class="hidden">
                         <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Chemical/Product Name</label>
-                            <input type="text" id="searchChemicalName" name="chemical_name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="e.g., Acetone, Bleach, Isopropyl Alcohol" required>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Signal Word</label>
+                            <select id="ghsSignalWord" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                                <option value="DANGER">DANGER</option>
+                                <option value="WARNING" selected>WARNING</option>
+                                <option value="CAUTION">CAUTION</option>
+                            </select>
                         </div>
                         
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Department</label>
-                                <select id="searchDepartmentSelect" name="department" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
-                                    <option value="">Choose department...</option>
-                                </select>
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">City</label>
-                                <select id="searchCitySelect" name="city" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
-                                    <option value="">Choose city...</option>
-                                </select>
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">State</label>
-                                <select id="searchStateSelect" name="state" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
-                                    <option value="">Choose state...</option>
-                                </select>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Hazard Pictograms</label>
+                            <div class="pictogram-selector">
+                                <div class="pictogram-item" data-pictogram="explosive">
+                                    <div class="text-2xl">💥</div>
+                                    <div class="text-xs">Explosive</div>
+                                </div>
+                                <div class="pictogram-item" data-pictogram="flammable">
+                                    <div class="text-2xl">🔥</div>
+                                    <div class="text-xs">Flammable</div>
+                                </div>
+                                <div class="pictogram-item" data-pictogram="toxic">
+                                    <div class="text-2xl">☠️</div>
+                                    <div class="text-xs">Toxic</div>
+                                </div>
+                                <div class="pictogram-item" data-pictogram="corrosive">
+                                    <div class="text-2xl">⚠️</div>
+                                    <div class="text-xs">Corrosive</div>
+                                </div>
+                                <div class="pictogram-item" data-pictogram="environmental">
+                                    <div class="text-2xl">🐟</div>
+                                    <div class="text-xs">Environmental</div>
+                                </div>
+                                <div class="pictogram-item" data-pictogram="health hazard">
+                                    <div class="text-2xl">⚠️</div>
+                                    <div class="text-xs">Health Hazard</div>
+                                </div>
                             </div>
                         </div>
                         
-                        <div class="flex justify-end space-x-3">
-                            <button type="button" id="cancelWebSearch" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">
-                                Cancel
-                            </button>
-                            <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
-                                <i class="fas fa-search mr-2"></i>Search & Download
-                            </button>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Hazard Statements</label>
+                            <textarea id="ghsHazardStatements" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Enter hazard statements..."></textarea>
                         </div>
-                    </form>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Precautionary Statements</label>
+                            <textarea id="ghsPrecautionaryStatements" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Enter precautionary statements..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" id="cancelGHS" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">
+                            Cancel
+                        </button>
+                        <button id="generateGHSFinal" type="button" class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>Generate GHS Label
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Enhanced Label Generation Modal -->
-    <div id="labelModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
+    <!-- Simple Sticker Modal -->
+    <div id="stickerModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
         <div class="flex items-center justify-center min-h-screen p-4">
             <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
                 <div class="p-6">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-bold text-gray-900">Generate Safety Labels</h3>
-                        <button id="closeLabelModal" class="text-gray-400 hover:text-gray-600">
+                        <h3 class="text-lg font-bold text-gray-900">Generate Safety Sticker</h3>
+                        <button id="closeStickerModal" class="text-gray-400 hover:text-gray-600">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
                     
                     <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700 mb-2">Product Name</label>
-                        <input type="text" id="labelProductName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Enter product name (e.g., Acetone, Bleach)">
-                        <p class="text-xs text-gray-500 mt-1">Enter the name of a chemical you've uploaded or searched for</p>
-                    </div>
-                    
-                    <!-- Label Type Selection -->
-                    <div class="mb-6">
-                        <h4 class="font-semibold text-gray-700 mb-3">Choose Label Type:</h4>
-                        <div class="grid grid-cols-1 gap-3">
-                            <button id="generateNFPA" type="button" class="flex items-center p-4 border-2 border-red-200 rounded-lg hover:border-red-400 hover:bg-red-50 transition">
-                                <div class="p-2 bg-red-100 rounded-full mr-3">
-                                    <i class="fas fa-diamond text-red-600 text-lg"></i>
-                                </div>
-                                <div class="text-left">
-                                    <h5 class="font-semibold text-red-600">NFPA 704 Diamond</h5>
-                                    <p class="text-sm text-gray-600">Standard fire diamond with hazard ratings</p>
-                                </div>
-                            </button>
-                            
-                            <button id="generateGHS" type="button" class="flex items-center p-4 border-2 border-orange-200 rounded-lg hover:border-orange-400 hover:bg-orange-50 transition">
-                                <div class="p-2 bg-orange-100 rounded-full mr-3">
-                                    <i class="fas fa-exclamation-triangle text-orange-600 text-lg"></i>
-                                </div>
-                                <div class="text-left">
-                                    <h5 class="font-semibold text-orange-600">GHS Hazard Label</h5>
-                                    <p class="text-sm text-gray-600">Globally harmonized system label</p>
-                                </div>
-                            </button>
-                        </div>
+                        <input type="text" id="stickerProductName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Enter product name...">
                     </div>
                     
                     <div class="flex justify-end space-x-3">
-                        <button type="button" id="cancelLabel" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">
+                        <button type="button" id="cancelSticker" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">
                             Cancel
+                        </button>
+                        <button id="generateNFPA" type="button" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+                            <i class="fas fa-diamond mr-2"></i>NFPA Diamond
+                        </button>
+                        <button id="generateGHS" type="button" class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>GHS Label
                         </button>
                     </div>
                 </div>
@@ -201,17 +464,18 @@
     <script>
         // Global variables
         let currentConversation = [];
+        let selectedGHSOption = 'auto';
+        let selectedPictograms = [];
         
         // Initialize app
         document.addEventListener('DOMContentLoaded', function() {
             loadDashboardStats();
-            loadDepartments();
             loadStates();
-            loadRecentDocuments();
+            loadLocations();
             setupEventListeners();
         });
         
-        // Setup enhanced event listeners
+        // Setup event listeners
         function setupEventListeners() {
             // Question answering
             document.getElementById('askBtn').addEventListener('click', askQuestion);
@@ -234,37 +498,88 @@
             document.getElementById('cancelUpload').addEventListener('click', () => hideModal('uploadModal'));
             document.getElementById('uploadForm').addEventListener('submit', handleFileUpload);
             
-            // Web search
-            document.getElementById('webSearchBtn').addEventListener('click', () => showModal('webSearchModal'));
-            document.getElementById('webSearchDocBtn').addEventListener('click', () => showModal('webSearchModal'));
-            document.getElementById('closeWebSearchModal').addEventListener('click', () => hideModal('webSearchModal'));
-            document.getElementById('cancelWebSearch').addEventListener('click', () => hideModal('webSearchModal'));
-            document.getElementById('webSearchForm').addEventListener('submit', handleWebSearch);
+            // Sticker generation dropdown
+            document.getElementById('generateStickerBtn').addEventListener('click', function(e) {
+                e.stopPropagation();
+                const dropdown = document.getElementById('stickerDropdown');
+                dropdown.classList.toggle('hidden');
+            });
             
-            // Label generation
-            document.getElementById('generateLabelBtn').addEventListener('click', () => showModal('labelModal'));
-            document.getElementById('generateLabelsBtn').addEventListener('click', () => showModal('labelModal'));
-            document.getElementById('closeLabelModal').addEventListener('click', () => hideModal('labelModal'));
-            document.getElementById('cancelLabel').addEventListener('click', () => hideModal('labelModal'));
-            document.getElementById('generateNFPA').addEventListener('click', () => generateLabel('nfpa'));
-            document.getElementById('generateGHS').addEventListener('click', () => generateLabel('ghs'));
+            // Hide dropdown when clicking outside
+            document.addEventListener('click', function() {
+                document.getElementById('stickerDropdown').classList.add('hidden');
+            });
             
-            // Enhanced dropdowns
+            // Dropdown options
+            document.getElementById('generateNFPAQuick').addEventListener('click', () => {
+                document.getElementById('stickerDropdown').classList.add('hidden');
+                showModal('stickerModal');
+            });
+            document.getElementById('generateGHSQuick').addEventListener('click', () => {
+                document.getElementById('stickerDropdown').classList.add('hidden');
+                showModal('stickerModal');
+            });
+            document.getElementById('generateGHSCustom').addEventListener('click', () => {
+                document.getElementById('stickerDropdown').classList.add('hidden');
+                showModal('ghsModal');
+            });
+            
+            // Simple sticker modal
+            document.getElementById('closeStickerModal').addEventListener('click', () => hideModal('stickerModal'));
+            document.getElementById('cancelSticker').addEventListener('click', () => hideModal('stickerModal'));
+            document.getElementById('generateNFPA').addEventListener('click', () => generateSticker('nfpa'));
+            document.getElementById('generateGHS').addEventListener('click', () => generateSticker('ghs'));
+            
+            // Enhanced GHS modal
+            document.getElementById('closeGHSModal').addEventListener('click', () => hideModal('ghsModal'));
+            document.getElementById('cancelGHS').addEventListener('click', () => hideModal('ghsModal'));
+            document.getElementById('generateGHSFinal').addEventListener('click', generateEnhancedGHS);
+            
+            // GHS option selection
+            document.querySelectorAll('.ghs-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    document.querySelectorAll('.ghs-option').forEach(opt => opt.classList.remove('selected'));
+                    this.classList.add('selected');
+                    selectedGHSOption = this.dataset.option;
+                    
+                    const customOptions = document.getElementById('customGHSOptions');
+                    if (selectedGHSOption === 'custom') {
+                        customOptions.classList.remove('hidden');
+                    } else {
+                        customOptions.classList.add('hidden');
+                    }
+                });
+            });
+            
+            // Pictogram selection
+            document.querySelectorAll('.pictogram-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    const pictogram = this.dataset.pictogram;
+                    if (this.classList.contains('selected')) {
+                        this.classList.remove('selected');
+                        selectedPictograms = selectedPictograms.filter(p => p !== pictogram);
+                    } else {
+                        this.classList.add('selected');
+                        selectedPictograms.push(pictogram);
+                    }
+                });
+            });
+            
+            // State/Location handling
             document.getElementById('uploadStateSelect').addEventListener('change', function() {
-                loadCitiesByState(this.value, 'uploadCitySelect');
+                loadLocationsByState(this.value, 'uploadLocationSelect');
             });
             
-            document.getElementById('searchStateSelect').addEventListener('change', function() {
-                loadCitiesByState(this.value, 'searchCitySelect');
+            // Web search info
+            document.getElementById('webSearchInfo').addEventListener('click', function() {
+                showToast('Web search is automatically activated when local SDS documents don\'t contain the information you need!', 'info');
             });
-            
-            document.getElementById('stateFilter').addEventListener('change', updateLocationFilters);
             
             // Toast close
             document.getElementById('closeToast').addEventListener('click', hideToast);
         }
         
-        // Load enhanced dashboard statistics
+        // Load dashboard statistics
         async function loadDashboardStats() {
             try {
                 const response = await fetch('/api/dashboard-stats');
@@ -273,38 +588,12 @@
                 document.getElementById('totalDocs').textContent = stats.total_documents;
                 document.getElementById('activeLocations').textContent = stats.active_locations;
                 document.getElementById('recentQuestions').textContent = stats.recent_questions;
-                document.getElementById('hazardousMaterials').textContent = stats.hazardous_materials;
-                document.getElementById('webSearches').textContent = stats.web_searches_performed || 0;
+                document.getElementById('webSearches').textContent = stats.web_searches || 0;
                 
                 updatePopularQuestions(stats.popular_questions);
-                updateTopDepartments(stats.top_departments);
                 
             } catch (error) {
                 console.error('Error loading dashboard stats:', error);
-            }
-        }
-        
-        // Load departments
-        async function loadDepartments() {
-            try {
-                const response = await fetch('/api/departments');
-                const departments = await response.json();
-                
-                const selects = ['uploadDepartmentSelect', 'searchDepartmentSelect', 'departmentFilter'];
-                selects.forEach(selectId => {
-                    const select = document.getElementById(selectId);
-                    if (select) {
-                        departments.forEach(dept => {
-                            const option = document.createElement('option');
-                            option.value = dept.name;
-                            option.textContent = dept.name;
-                            select.appendChild(option);
-                        });
-                    }
-                });
-                
-            } catch (error) {
-                console.error('Error loading departments:', error);
             }
         }
         
@@ -314,17 +603,12 @@
                 const response = await fetch('/api/states');
                 const states = await response.json();
                 
-                const selects = ['uploadStateSelect', 'searchStateSelect', 'stateFilter'];
-                selects.forEach(selectId => {
-                    const select = document.getElementById(selectId);
-                    if (select) {
-                        states.forEach(state => {
-                            const option = document.createElement('option');
-                            option.value = state;
-                            option.textContent = state;
-                            select.appendChild(option);
-                        });
-                    }
+                const select = document.getElementById('uploadStateSelect');
+                states.forEach(state => {
+                    const option = document.createElement('option');
+                    option.value = state;
+                    option.textContent = state;
+                    select.appendChild(option);
                 });
                 
             } catch (error) {
@@ -332,58 +616,313 @@
             }
         }
         
-        // Load cities by state
-        async function loadCitiesByState(state, selectId) {
-            if (!state) {
-                document.getElementById(selectId).innerHTML = '<option value="">Choose a city...</option>';
-                return;
-            }
-            
+        // Load locations
+        async function loadLocations() {
             try {
-                const response = await fetch(`/api/cities?state=${encodeURIComponent(state)}`);
-                const cities = await response.json();
+                const response = await fetch('/api/locations');
+                const locations = await response.json();
                 
-                const select = document.getElementById(selectId);
-                select.innerHTML = '<option value="">Choose a city...</option>';
-                
-                cities.forEach(city => {
+                const select = document.getElementById('locationFilter');
+                locations.slice(0, 50).forEach(location => {
                     const option = document.createElement('option');
-                    option.value = city;
-                    option.textContent = city;
+                    option.value = location.id;
+                    option.textContent = location.display_name;
                     select.appendChild(option);
                 });
                 
             } catch (error) {
-                console.error('Error loading cities:', error);
+                console.error('Error loading locations:', error);
             }
         }
         
-        // Load recent documents
-        async function loadRecentDocuments() {
+        // Load locations by state
+        async function loadLocationsByState(state, selectId) {
+            if (!state) {
+                document.getElementById(selectId).innerHTML = '<option value="">Choose a location...</option>';
+                return;
+            }
+            
             try {
-                const response = await fetch('/api/recent-documents');
-                const documents = await response.json();
+                const response = await fetch(`/api/locations?state=${encodeURIComponent(state)}`);
+                const locations = await response.json();
                 
-                const container = document.getElementById('recentDocumentsList');
-                container.innerHTML = '';
+                const select = document.getElementById(selectId);
+                select.innerHTML = '<option value="">Choose a location...</option>';
                 
-                if (documents.length === 0) {
-                    container.innerHTML = '<p class="text-gray-500 text-center py-4">No documents uploaded yet</p>';
-                    return;
+                locations.forEach(location => {
+                    const option = document.createElement('option');
+                    option.value = location.id;
+                    option.textContent = location.display_name;
+                    select.appendChild(option);
+                });
+                
+            } catch (error) {
+                console.error('Error loading locations:', error);
+            }
+        }
+        
+        // Enhanced ask question with web search support
+        async function askQuestion() {
+            const question = document.getElementById('questionInput').value.trim();
+            const locationId = document.getElementById('locationFilter').value;
+            
+            if (!question) {
+                showToast('Please enter a question', 'warning');
+                return;
+            }
+            
+            // Add user message to chat
+            addMessageToChat(question, 'user');
+            document.getElementById('questionInput').value = '';
+            
+            // Show loading with web search indicator
+            const loadingDiv = addMessageToChat('🔍 Searching your SDS documents and the web...', 'ai', true);
+            
+            try {
+                const response = await fetch('/api/ask-question-enhanced', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        question: question,
+                        location_id: locationId || null
+                    })
+                });
+                
+                const result = await response.json();
+                
+                // Remove loading message
+                loadingDiv.remove();
+                
+                if (result.success) {
+                    let answer = result.answer;
+                    let messageClass = 'ai-message';
+                    
+                    // Determine if web results were used
+                    if (result.has_web_results) {
+                        messageClass += ' web-result';
+                        answer = '🌐 ' + answer;
+                    } else {
+                        messageClass += ' local-result';
+                        answer = '📄 ' + answer;
+                    }
+                    
+                    // Add sources information
+                    if (result.sources && result.sources.length > 0) {
+                        const localSources = result.sources.filter(s => s.type !== 'web');
+                        const webSources = result.sources.filter(s => s.type === 'web');
+                        
+                        if (localSources.length > 0) {
+                            answer += "\n\n📋 Local Sources: " + localSources.map(s => s.product_name || s.url).join(', ');
+                        }
+                        if (webSources.length > 0) {
+                            answer += "\n\n🔗 Web Sources: " + webSources.map(s => s.url).join(', ');
+                        }
+                    }
+                    
+                    // Add confidence indicator
+                    const confidence = Math.round((result.confidence || 0) * 100);
+                    answer += `\n\n🎯 Confidence: ${confidence}%`;
+                    
+                    addMessageToChat(answer, 'ai', false, messageClass);
+                } else {
+                    addMessageToChat(result.answer || 'Sorry, I couldn\'t find an answer to your question.', 'ai');
                 }
                 
-                documents.forEach(doc => {
-                    const div = document.createElement('div');
-                    div.className = 'p-3 border rounded-lg hover:bg-gray-50 transition cursor-pointer';
-                    div.innerHTML = `
-                        <h4 class="font-medium text-sm">${doc.product_name}</h4>
-                        <p class="text-xs text-gray-500">${doc.location}</p>
-                        <div class="flex justify-between items-center mt-1">
-                            <p class="text-xs text-gray-400">${new Date(doc.uploaded_date).toLocaleDateString()}</p>
-                            <span class="text-xs">${doc.source}</span>
-                        </div>
-                    `;
-                    div.addEventListener('click', () => {
+                // Update dashboard stats
+                loadDashboardStats();
+                
+            } catch (error) {
+                loadingDiv.remove();
+                addMessageToChat('Sorry, there was an error processing your question.', 'ai');
+                console.error('Error asking question:', error);
+            }
+        }
+        
+        // Enhanced add message to chat
+        function addMessageToChat(message, sender, isLoading = false, customClass = '') {
+            const chatContainer = document.getElementById('chatContainer');
+            const messageDiv = document.createElement('div');
+            
+            let messageClass = `message ${sender}-message p-3 rounded-lg ${isLoading ? 'opacity-50' : ''}`;
+            if (customClass) {
+                messageClass = `message p-3 rounded-lg ${customClass} ${isLoading ? 'opacity-50' : ''}`;
+            }
+            
+            messageDiv.className = messageClass;
+            
+            const senderLabel = sender === 'user' ? 'You' : 'AI Assistant';
+            messageDiv.innerHTML = `<p><strong>${senderLabel}:</strong> ${message.replace(/\n/g, '<br>')}</p>`;
+            
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            
+            return messageDiv;
+        }
+        
+        // Handle file upload
+        async function handleFileUpload(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const uploadBtn = e.target.querySelector('button[type="submit"]');
+            
+            // Show loading state
+            uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Uploading...';
+            uploadBtn.disabled = true;
+            
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showToast(`File uploaded successfully: ${result.product_name}`, 'success');
+                    hideModal('uploadModal');
+                    e.target.reset();
+                    loadDashboardStats();
+                } else {
+                    showToast(result.message, 'error');
+                }
+                
+            } catch (error) {
+                console.error('Error uploading file:', error);
+                showToast('Error uploading file', 'error');
+            } finally {
+                uploadBtn.innerHTML = '<i class="fas fa-upload mr-2"></i>Upload';
+                uploadBtn.disabled = false;
+            }
+        }
+        
+        // Generate simple sticker
+        async function generateSticker(type) {
+            const productName = document.getElementById('stickerProductName').value.trim();
+            
+            if (!productName) {
+                showToast('Please enter a product name', 'warning');
+                return;
+            }
+            
+            try {
+                const endpoint = type === 'nfpa' ? '/api/generate-nfpa' : '/api/generate-ghs';
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ product_name: productName })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showToast(`${result.sticker_type} sticker generated successfully`, 'success');
+                    hideModal('stickerModal');
+                    
+                    // Create download link
+                    const link = document.createElement('a');
+                    link.href = `/api/download-sticker/${result.filename}`;
+                    link.download = result.filename;
+                    link.click();
+                } else {
+                    showToast(result.message, 'error');
+                }
+                
+            } catch (error) {
+                console.error('Error generating sticker:', error);
+                showToast('Error generating sticker', 'error');
+            }
+        }
+        
+        // Generate enhanced GHS sticker
+        async function generateEnhancedGHS() {
+            const productName = document.getElementById('ghsProductName').value.trim();
+            
+            if (!productName) {
+                showToast('Please enter a product name', 'warning');
+                return;
+            }
+            
+            let requestData = { product_name: productName };
+            
+            if (selectedGHSOption === 'custom') {
+                const customData = {
+                    signal_word: document.getElementById('ghsSignalWord').value,
+                    pictograms: selectedPictograms.join(', '),
+                    hazard_statements: document.getElementById('ghsHazardStatements').value,
+                    precautionary_statements: document.getElementById('ghsPrecautionaryStatements').value
+                };
+                requestData.custom_data = customData;
+            }
+            
+            try {
+                const response = await fetch('/api/generate-ghs-enhanced', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showToast('Enhanced GHS label generated successfully', 'success');
+                    hideModal('ghsModal');
+                    
+                    // Create download link
+                    const link = document.createElement('a');
+                    link.href = `/api/download-sticker/${result.filename}`;
+                    link.download = result.filename;
+                    link.click();
+                    
+                    // Reset form
+                    resetGHSForm();
+                } else {
+                    showToast(result.message, 'error');
+                }
+                
+            } catch (error) {
+                console.error('Error generating enhanced GHS sticker:', error);
+                showToast('Error generating enhanced GHS sticker', 'error');
+            }
+        }
+        
+        // Reset GHS form
+        function resetGHSForm() {
+            document.getElementById('ghsProductName').value = '';
+            document.getElementById('ghsSignalWord').value = 'WARNING';
+            document.getElementById('ghsHazardStatements').value = '';
+            document.getElementById('ghsPrecautionaryStatements').value = '';
+            selectedPictograms = [];
+            document.querySelectorAll('.pictogram-item').forEach(item => item.classList.remove('selected'));
+            document.querySelectorAll('.ghs-option').forEach(opt => opt.classList.remove('selected'));
+            document.getElementById('customGHSOptions').classList.add('hidden');
+            selectedGHSOption = 'auto';
+        }
+        
+        // Update popular questions
+        function updatePopularQuestions(questions) {
+            const container = document.getElementById('popularQuestions');
+            container.innerHTML = '';
+            
+            if (questions.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-4 col-span-2">No questions asked yet</p>';
+                return;
+            }
+            
+            questions.forEach(q => {
+                const div = document.createElement('div');
+                div.className = 'bg-gray-50 p-3 rounded-lg cursor-pointer hover:bg-gray-100 transition';
+                div.innerHTML = `
+                    <p class="text-sm font-medium">${q.question}</p>
+                    <p class="text-xs text-gray-500">${q.count} times asked</p>
+                `;
+                div.addEventListener('click', () => {
                     document.getElementById('questionInput').value = q.question;
                     askQuestion();
                 });
@@ -391,53 +930,23 @@
             });
         }
         
-        // Update top departments display
-        function updateTopDepartments(departments) {
-            const container = document.getElementById('topDepartments');
-            container.innerHTML = '';
-            
-            if (departments.length === 0) {
-                container.innerHTML = '<p class="text-gray-500 text-center py-4">No data available yet</p>';
-                return;
-            }
-            
-            departments.forEach(dept => {
-                const div = document.createElement('div');
-                div.className = 'flex justify-between items-center p-3 bg-gray-50 rounded-lg';
-                div.innerHTML = `
-                    <div>
-                        <p class="text-sm font-medium">${dept.department}</p>
-                        <p class="text-xs text-gray-500">${dept.count} documents</p>
-                    </div>
-                    <div class="w-16 bg-gray-200 rounded-full h-2">
-                        <div class="bg-blue-600 h-2 rounded-full" style="width: ${Math.min(100, (dept.count / departments[0].count) * 100)}%"></div>
-                    </div>
-                `;
-                container.appendChild(div);
-            });
-        }
-        
         // Modal utilities
         function showModal(modalId) {
             document.getElementById(modalId).classList.remove('hidden');
-            
-            // Load data when showing modals
-            if (modalId === 'uploadModal' || modalId === 'webSearchModal') {
-                loadDepartments();
+            if (modalId === 'uploadModal') {
                 loadStates();
+            } else if (modalId === 'ghsModal') {
+                resetGHSForm();
+                // Auto-select first option
+                document.querySelector('.ghs-option[data-option="auto"]').classList.add('selected');
             }
         }
         
         function hideModal(modalId) {
             document.getElementById(modalId).classList.add('hidden');
-            
-            // Reset forms when hiding modals
-            const modal = document.getElementById(modalId);
-            const forms = modal.querySelectorAll('form');
-            forms.forEach(form => form.reset());
         }
         
-        // Enhanced toast notification utility
+        // Toast notification utility
         function showToast(message, type = 'info') {
             const toast = document.getElementById('toast');
             const icon = document.getElementById('toastIcon');
@@ -465,608 +974,6 @@
         function hideToast() {
             document.getElementById('toast').classList.add('hidden');
         }
-        
-        // Auto-refresh dashboard every 30 seconds
-        setInterval(loadDashboardStats, 30000);
     </script>
 </body>
-</html>', () => {
-                        document.getElementById('questionInput').value = `Tell me about ${doc.product_name}`;
-                        askQuestion();
-                    });
-                    container.appendChild(div);
-                });
-                
-            } catch (error) {
-                console.error('Error loading recent documents:', error);
-            }
-        }
-        
-        // Enhanced question asking with auto web search support
-        async function askQuestion() {
-            const question = document.getElementById('questionInput').value.trim();
-            const department = document.getElementById('departmentFilter')?.value;
-            const city = document.getElementById('cityFilter')?.value;
-            const state = document.getElementById('stateFilter')?.value;
-            
-            if (!question) {
-                showToast('Please enter a question', 'warning');
-                return;
-            }
-            
-            // Add user message to chat
-            addMessageToChat(question, 'user');
-            document.getElementById('questionInput').value = '';
-            
-            // Show loading with web search capability
-            const loadingDiv = addMessageToChat('Searching local database and online if needed...', 'ai', true);
-            
-            try {
-                const response = await fetch('/api/ask-question', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        question: question,
-                        department: department || null,
-                        city: city || null,
-                        state: state || null
-                    })
-                });
-                
-                const result = await response.json();
-                
-                // Remove loading message
-                loadingDiv.remove();
-                
-                if (result.success) {
-                    let answer = result.answer;
-                    
-                    // Add location context if applicable
-                    if (result.location_context) {
-                        answer += `\n\n*Filtered by: ${result.location_context}*`;
-                    }
-                    
-                    // Add sources information
-                    if (result.sources && result.sources.length > 0) {
-                        answer += "\n\n**Sources:**\n" + result.sources.map(s => 
-                            `• ${s.product_name} (${s.location}) - ${s.content_source}`
-                        ).join('\n');
-                    }
-                    
-                    addMessageToChat(answer, 'ai');
-                    
-                    // Show confidence indicator
-                    if (result.confidence !== undefined) {
-                        showConfidence(result.confidence);
-                    }
-                    
-                    // Show web search notification if performed
-                    if (result.web_search_performed) {
-                        showToast(`🌐 Found "${result.chemical_found}" online and added to database!`, 'success');
-                    }
-                } else {
-                    addMessageToChat(result.answer || 'Sorry, I couldn\'t find an answer to your question.', 'ai');
-                }
-                
-                // Refresh stats after question
-                loadDashboardStats();
-                loadRecentDocuments();
-                
-            } catch (error) {
-                loadingDiv.remove();
-                addMessageToChat('Sorry, there was an error processing your question.', 'ai');
-                console.error('Error asking question:', error);
-            }
-        }
-        
-        // Show confidence indicator
-        function showConfidence(confidence) {
-            const indicator = document.getElementById('confidenceIndicator');
-            const bar = document.getElementById('confidenceBar');
-            const text = document.getElementById('confidenceText');
-            
-            const percentage = Math.round(confidence * 100);
-            text.textContent = `${percentage}%`;
-            bar.style.width = `${percentage}%`;
-            
-            indicator.classList.remove('hidden');
-            
-            // Hide after 5 seconds
-            setTimeout(() => {
-                indicator.classList.add('hidden');
-            }, 5000);
-        }
-        
-        // Enhanced message adding with better formatting
-        function addMessageToChat(message, sender, isLoading = false) {
-            const chatContainer = document.getElementById('chatContainer');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${sender}-message p-3 rounded-lg ${isLoading ? 'opacity-50' : ''}`;
-            
-            const senderLabel = sender === 'user' ? 'You' : 'AI Assistant';
-            
-            // Convert markdown-style formatting to HTML
-            const formattedMessage = message
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/🌐/g, '<span class="text-blue-600">🌐</span>')
-                .replace(/📄/g, '<span class="text-green-600">📄</span>')
-                .replace(/\n/g, '<br>');
-            
-            messageDiv.innerHTML = `<p><strong>${senderLabel}:</strong> ${formattedMessage}</p>`;
-            
-            chatContainer.appendChild(messageDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-            
-            return messageDiv;
-        }
-        
-        // Handle enhanced file upload
-        async function handleFileUpload(e) {
-            e.preventDefault();
-            
-            const formData = new FormData();
-            const fileInput = document.getElementById('file-upload');
-            const department = document.getElementById('uploadDepartmentSelect').value;
-            const city = document.getElementById('uploadCitySelect').value;
-            const state = document.getElementById('uploadStateSelect').value;
-            const country = e.target.country.value;
-            
-            if (!fileInput.files[0] || !department || !city || !state) {
-                showToast('Please fill in all required fields', 'warning');
-                return;
-            }
-            
-            formData.append('file', fileInput.files[0]);
-            formData.append('department', department);
-            formData.append('city', city);
-            formData.append('state', state);
-            formData.append('country', country);
-            
-            const uploadBtn = e.target.querySelector('button[type="submit"]');
-            
-            // Show loading state
-            uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Uploading...';
-            uploadBtn.disabled = true;
-            
-            try {
-                const response = await fetch('/api/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    showToast(`File uploaded successfully: ${result.product_name}`, 'success');
-                    hideModal('uploadModal');
-                    e.target.reset();
-                    loadDashboardStats();
-                    loadRecentDocuments();
-                } else {
-                    showToast(result.message, 'error');
-                }
-                
-            } catch (error) {
-                console.error('Error uploading file:', error);
-                showToast('Error uploading file', 'error');
-            } finally {
-                uploadBtn.innerHTML = '<i class="fas fa-upload mr-2"></i>Upload';
-                uploadBtn.disabled = false;
-            }
-        }
-        
-        // Handle web search for SDS
-        async function handleWebSearch(e) {
-            e.preventDefault();
-            
-            const chemicalName = document.getElementById('searchChemicalName').value.trim();
-            const department = document.getElementById('searchDepartmentSelect').value;
-            const city = document.getElementById('searchCitySelect').value;
-            const state = document.getElementById('searchStateSelect').value;
-            
-            if (!chemicalName || !department || !city || !state) {
-                showToast('Please fill in all required fields', 'warning');
-                return;
-            }
-            
-            const searchBtn = e.target.querySelector('button[type="submit"]');
-            
-            // Show loading state
-            searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Searching...';
-            searchBtn.disabled = true;
-            
-            try {
-                const response = await fetch('/api/search-web-sds', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        chemical_name: chemicalName,
-                        department: department,
-                        city: city,
-                        state: state
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    showToast(`Found and stored SDS for ${result.product_name}`, 'success');
-                    hideModal('webSearchModal');
-                    e.target.reset();
-                    loadDashboardStats();
-                    loadRecentDocuments();
-                } else {
-                    showToast(result.message, 'error');
-                }
-                
-            } catch (error) {
-                console.error('Error searching for SDS:', error);
-                showToast('Error searching for SDS', 'error');
-            } finally {
-                searchBtn.innerHTML = '<i class="fas fa-search mr-2"></i>Search & Download';
-                searchBtn.disabled = false;
-            }
-        }
-        
-        // Generate label (enhanced with dual options)
-        async function generateLabel(type) {
-            const productName = document.getElementById('labelProductName').value.trim();
-            
-            if (!productName) {
-                showToast('Please enter a product name', 'warning');
-                return;
-            }
-            
-            try {
-                const endpoint = type === 'nfpa' ? '/api/generate-nfpa' : '/api/generate-ghs';
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ product_name: productName })
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    showToast(`${result.label_type} label generated successfully`, 'success');
-                    hideModal('labelModal');
-                    
-                    // Create download link
-                    const link = document.createElement('a');
-                    link.href = `/api/download-label/${result.filename}`;
-                    link.download = result.filename;
-                    link.click();
-                } else {
-                    showToast(result.message, 'error');
-                }
-                
-            } catch (error) {
-                console.error('Error generating label:', error);
-                showToast('Error generating label', 'error');
-            }
-        }
-        
-        // Update location filters based on selection
-        function updateLocationFilters() {
-            const state = document.getElementById('stateFilter').value;
-            if (state) {
-                loadCitiesByState(state, 'cityFilter');
-            } else {
-                document.getElementById('cityFilter').innerHTML = '<option value="">All Cities</option>';
-            }
-        }
-        
-        // Update popular questions display
-        function updatePopularQuestions(questions) {
-            const container = document.getElementById('popularQuestions');
-            container.innerHTML = '';
-            
-            if (questions.length === 0) {
-                container.innerHTML = '<p class="text-gray-500 text-center py-4">No questions asked yet</p>';
-                return;
-            }
-            
-            questions.forEach(q => {
-                const div = document.createElement('div');
-                div.className = 'flex justify-between items-center p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition';
-                div.innerHTML = `
-                    <div>
-                        <p class="text-sm font-medium">${q.question}</p>
-                        <p class="text-xs text-gray-500">${q.count} times asked</p>
-                    </div>
-                    <i class="fas fa-chevron-right text-gray-400"></i>
-                `;
-                div.addEventListener('click<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EHS Smart System - SDS Assistant</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-        .card-hover:hover { transform: translateY(-2px); transition: transform 0.3s; }
-        .chat-container { max-height: 500px; overflow-y: auto; }
-        .message { margin-bottom: 1rem; animation: fadeIn 0.3s ease-in; }
-        .user-message { background: #3b82f6; color: white; }
-        .ai-message { background: #f3f4f6; color: #374151; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .filter-section { background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); }
-        .confidence-bar { height: 4px; border-radius: 2px; transition: width 0.5s ease; }
-        .web-search-indicator { animation: pulse 2s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-    </style>
-</head>
-<body class="bg-gray-50 min-h-screen">
-    <!-- Enhanced Navigation -->
-    <nav class="gradient-bg shadow-lg">
-        <div class="max-w-7xl mx-auto px-4">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <i class="fas fa-shield-alt text-white text-2xl mr-3"></i>
-                    <span class="text-white text-xl font-bold">EHS Smart System</span>
-                    <span class="text-white text-sm ml-2 opacity-75">Safety Data Sheet Assistant with Auto Web Search</span>
-                </div>
-                <div class="flex items-center space-x-4">
-                    <button id="uploadBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition">
-                        <i class="fas fa-upload mr-2"></i>Upload SDS
-                    </button>
-                    <button id="generateLabelBtn" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg transition">
-                        <i class="fas fa-tags mr-2"></i>Generate Labels
-                    </button>
-                    <button id="webSearchBtn" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition">
-                        <i class="fas fa-globe mr-2"></i>Web Search
-                    </button>
-                </div>
-            </div>
-        </div>
-    </nav>
-
-    <div class="max-w-7xl mx-auto px-4 py-8">
-        <!-- Enhanced Dashboard Stats -->
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-            <div class="bg-white rounded-lg shadow p-6 card-hover">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-blue-100 text-blue-600">
-                        <i class="fas fa-file-alt text-2xl"></i>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Total Documents</p>
-                        <p id="totalDocs" class="text-2xl font-bold text-gray-900">0</p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="bg-white rounded-lg shadow p-6 card-hover">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-green-100 text-green-600">
-                        <i class="fas fa-map-marker-alt text-2xl"></i>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Active Locations</p>
-                        <p id="activeLocations" class="text-2xl font-bold text-gray-900">0</p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="bg-white rounded-lg shadow p-6 card-hover">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-purple-100 text-purple-600">
-                        <i class="fas fa-question-circle text-2xl"></i>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Questions Answered</p>
-                        <p id="recentQuestions" class="text-2xl font-bold text-gray-900">0</p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="bg-white rounded-lg shadow p-6 card-hover">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-red-100 text-red-600">
-                        <i class="fas fa-exclamation-triangle text-2xl"></i>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">High Hazard Materials</p>
-                        <p id="hazardousMaterials" class="text-2xl font-bold text-gray-900">0</p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="bg-white rounded-lg shadow p-6 card-hover">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-indigo-100 text-indigo-600">
-                        <i class="fas fa-globe text-2xl"></i>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Web Searches</p>
-                        <p id="webSearches" class="text-2xl font-bold text-gray-900">0</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Main Content Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <!-- Enhanced AI Question Answering -->
-            <div class="lg:col-span-2 bg-white rounded-lg shadow">
-                <div class="p-6">
-                    <h2 class="text-2xl font-bold text-gray-900 mb-4">
-                        <i class="fas fa-robot mr-2"></i>Ask AI About SDS Documents
-                        <span class="text-sm font-normal text-green-600 ml-2">🌐 Auto Web Search Enabled</span>
-                    </h2>
-                    
-                    <!-- Location Filters -->
-                    <div class="filter-section p-4 rounded-lg mb-4">
-                        <h4 class="font-semibold text-gray-700 mb-3">Filter by Location</h4>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <select id="departmentFilter" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                                <option value="">All Departments</option>
-                            </select>
-                            <select id="cityFilter" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                                <option value="">All Cities</option>
-                            </select>
-                            <select id="stateFilter" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                                <option value="">All States</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <!-- Chat Container -->
-                    <div id="chatContainer" class="chat-container border rounded-lg p-4 mb-4 bg-gray-50">
-                        <div class="message ai-message p-3 rounded-lg">
-                            <p><strong>AI Assistant:</strong> Hello! I can help you find information in your SDS documents. If I don't have the data locally, I'll automatically search online and store it for you. Try asking:</p>
-                            <ul class="mt-2 ml-4 list-disc text-sm">
-                                <li>"Tell me about acetone"</li>
-                                <li>"What are the first aid measures for cleaner degreaser?"</li>
-                                <li>"How should I store bleach in the laboratory?"</li>
-                                <li>"What PPE is needed for handling isopropyl alcohol?"</li>
-                            </ul>
-                        </div>
-                    </div>
-                    
-                    <!-- Question Input -->
-                    <div class="flex space-x-2 mb-4">
-                        <input 
-                            type="text" 
-                            id="questionInput" 
-                            placeholder="Ask about any chemical (e.g., 'Tell me about acetone' or 'First aid for bleach')"
-                            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        >
-                        <button id="askBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition">
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
-                    </div>
-                    
-                    <!-- Quick Questions -->
-                    <div class="mb-4">
-                        <h4 class="font-semibold text-gray-700 mb-2">Quick Questions:</h4>
-                        <div class="flex flex-wrap gap-2">
-                            <button class="quick-question bg-blue-100 hover:bg-blue-200 px-3 py-1 rounded-full text-sm transition" data-question="Tell me about acetone">
-                                About Acetone
-                            </button>
-                            <button class="quick-question bg-green-100 hover:bg-green-200 px-3 py-1 rounded-full text-sm transition" data-question="What are the first aid measures for bleach?">
-                                Bleach First Aid
-                            </button>
-                            <button class="quick-question bg-orange-100 hover:bg-orange-200 px-3 py-1 rounded-full text-sm transition" data-question="Tell me about isopropyl alcohol">
-                                About Isopropyl Alcohol
-                            </button>
-                            <button class="quick-question bg-red-100 hover:bg-red-200 px-3 py-1 rounded-full text-sm transition" data-question="What are the fire fighting measures for methanol?">
-                                Methanol Fire Safety
-                            </button>
-                            <button class="quick-question bg-purple-100 hover:bg-purple-200 px-3 py-1 rounded-full text-sm transition" data-question="Tell me about cleaner degreaser">
-                                About Cleaner Degreaser
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- Answer Confidence Indicator -->
-                    <div id="confidenceIndicator" class="hidden mb-4">
-                        <div class="flex items-center justify-between text-sm text-gray-600 mb-1">
-                            <span>Answer Confidence</span>
-                            <span id="confidenceText">0%</span>
-                        </div>
-                        <div class="w-full bg-gray-200 rounded-full h-2">
-                            <div id="confidenceBar" class="confidence-bar bg-gradient-to-r from-red-400 via-yellow-400 to-green-400" style="width: 0%"></div>
-                        </div>
-                    </div>
-                    
-                    <!-- Web Search Indicator -->
-                    <div id="webSearchIndicator" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                        <div class="flex items-center">
-                            <i class="fas fa-globe text-blue-600 text-lg mr-2 web-search-indicator"></i>
-                            <span class="text-blue-800 font-medium">Searching online for chemical information...</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Enhanced File Management & Recent Documents -->
-            <div class="bg-white rounded-lg shadow">
-                <div class="p-6">
-                    <h2 class="text-xl font-bold text-gray-900 mb-4">
-                        <i class="fas fa-file-upload mr-2"></i>Document Management
-                    </h2>
-                    
-                    <!-- Action Buttons -->
-                    <div class="grid grid-cols-1 gap-3 mb-6">
-                        <button id="uploadDocBtn" class="bg-blue-100 hover:bg-blue-200 p-4 rounded-lg transition text-center">
-                            <i class="fas fa-upload text-blue-600 text-xl mb-2"></i>
-                            <h3 class="font-semibold text-blue-600">Upload SDS File</h3>
-                            <p class="text-xs text-gray-600">PDF, TXT, DOC files</p>
-                        </button>
-                        
-                        <button id="webSearchDocBtn" class="bg-purple-100 hover:bg-purple-200 p-4 rounded-lg transition text-center">
-                            <i class="fas fa-globe text-purple-600 text-xl mb-2"></i>
-                            <h3 class="font-semibold text-purple-600">Search Web for SDS</h3>
-                            <p class="text-xs text-gray-600">Find SDS online</p>
-                        </button>
-                        
-                        <button id="generateLabelsBtn" class="bg-orange-100 hover:bg-orange-200 p-4 rounded-lg transition text-center">
-                            <i class="fas fa-tags text-orange-600 text-xl mb-2"></i>
-                            <h3 class="font-semibold text-orange-600">Generate Labels</h3>
-                            <p class="text-xs text-gray-600">NFPA & GHS labels</p>
-                        </button>
-                    </div>
-                    
-                    <!-- Recent Documents -->
-                    <div>
-                        <h4 class="font-semibold text-gray-700 mb-3">Recent Documents</h4>
-                        <div id="recentDocumentsList" class="space-y-2 max-h-64 overflow-y-auto">
-                            <p class="text-gray-500 text-center py-4">No documents uploaded yet</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Enhanced Analytics Section -->
-        <div class="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <!-- Popular Questions -->
-            <div class="bg-white rounded-lg shadow">
-                <div class="p-6">
-                    <h3 class="text-xl font-bold text-gray-900 mb-4">
-                        <i class="fas fa-chart-line mr-2"></i>Popular Questions
-                    </h3>
-                    <div id="popularQuestions" class="space-y-3">
-                        <p class="text-gray-500 text-center py-4">No questions asked yet</p>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Top Departments -->
-            <div class="bg-white rounded-lg shadow">
-                <div class="p-6">
-                    <h3 class="text-xl font-bold text-gray-900 mb-4">
-                        <i class="fas fa-building mr-2"></i>Top Departments
-                    </h3>
-                    <div id="topDepartments" class="space-y-3">
-                        <p class="text-gray-500 text-center py-4">No data available yet</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Enhanced Upload Modal -->
-    <div id="uploadModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="bg-white rounded-lg shadow-xl max-w-lg w-full">
-                <div class="p-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-bold text-gray-900">Upload SDS Document</h3>
-                        <button id="closeUploadModal" class="text-gray-400 hover:text-gray-600">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    
-                    <form id="uploadForm" enctype="multipart/form-data">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap
+</html>
